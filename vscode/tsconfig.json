@@ -1,0 +1,11 @@
+{
+  "extends": "..",
+  "compilerOptions": {
+    "paths": {
+      "@/src/*": ["./*"]
+    },
+    "rootDir": "."
+  },
+  "exclude": ["coverage/", "node_modules/"],
+  "include": ["**/*.ts"]
+}

@@ -1,0 +1,44 @@
+{
+  "name": "@workspace-mcp/vscode",
+  "description": "Visual Studio Code extension for Workspace MCP.",
+  "license": "AGPL-3.0-only",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "vscode": "^1.103.0"
+  },
+  "main": "./dist/index.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mcp.start",
+        "title": "MCP: Start server"
+      },
+      {
+        "command": "mcp.stop",
+        "title": "MCP: Stop server"
+      },
+      {
+        "command": "mcp.showLogs",
+        "title": "MCP: Show logs"
+      }
+    ]
+  },
+  "scripts": {
+    "test:e2e": "vitest --config=./configs/vitest.config.e2e.js",
+    "test:lint": "biome check --write --no-errors-on-unmatched .",
+    "test:type": "tsc",
+    "test:unit": "vitest --config=./configs/vitest.config.unit.js",
+    "test:unit:watch": "bun run test:unit --watch"
+  },
+  "dependencies": {
+    "bhala": "3.0.4",
+    "dayjs": "1.11.13",
+    "esm-path": "1.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "1.103.0",
+    "type-fest": "4.41.0"
+  }
+}

@@ -1,0 +1,4 @@
+[tools]
+bun = { version = "1.2", postinstall = "bun install" }
+# node = { version = "24", postinstall = "corepack enable" }
+rust = { version = "1.89", postinstall = "cargo install --path server" }

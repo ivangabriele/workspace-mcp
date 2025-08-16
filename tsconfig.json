@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "checkJs": false,
+    "composite": true,
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "lib": ["esnext"],
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2024",
+    "types": ["bun-types"],
+    "verbatimModuleSyntax": true
+  },
+  "exclude": ["node_modules/", "server/"],
+  "include": ["**/*.ts"]
+}
