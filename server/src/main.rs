@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 
 use clap::Parser;
-use rmcp::transport::{SseServer, sse_server::SseServerConfig};
+use rmcp::transport::{
+    StreamableHttpService, streamable_http_server::session::local::LocalSessionManager,
+};
 use tracing_subscriber::{
     layer::SubscriberExt,
     util::SubscriberInitExt,
@@ -26,6 +28,57 @@ struct Args {
     port: u16,
 }
 
+const INDEX_HTML: &str = include_str!("../public/index.html");
+
+struct TokenStore {
+    valid_tokens: Vec<String>,
+}
+impl TokenStore {
+    fn new(valid_tokens: Vec<String>) -> Self {
+        Self { valid_tokens }
+    }
+
+    fn is_valid(&self, token: &str) -> bool {
+        self.valid_tokens.contains(&token.to_string())
+    }
+}
+
+// Extract authorization token
+fn extract_token(headers: &axum::http::HeaderMap) -> Option<String> {
+    headers
+        .get("Authorization")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|auth_header| {
+            auth_header
+                .strip_prefix("Bearer ")
+                .map(|stripped| stripped.to_string())
+        })
+}
+
+// Authorization middleware
+async fn auth_middleware(
+    axum::extract::State(token_store): axum::extract::State<std::sync::Arc<TokenStore>>,
+    headers: axum::http::HeaderMap,
+    request: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    match extract_token(&headers) {
+        Some(token) if token_store.is_valid(&token) => {
+            // Token is valid, proceed with the request
+            Ok(next.run(request).await)
+        }
+        _ => {
+            // Token is invalid, return 401 error
+            Err(axum::http::StatusCode::UNAUTHORIZED)
+        }
+    }
+}
+
+// Root path handler
+async fn index() -> axum::response::Html<&'static str> {
+    axum::response::Html(INDEX_HTML)
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
@@ -37,37 +90,39 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let args = Args::parse();
-    let addr: std::net::SocketAddr = core::net::SocketAddr::from(([127, 0, 0, 1], args.port));
-    let config = SseServerConfig {
-        bind: addr,
-        sse_path: "/sse".to_string(),
-        post_path: "/message".to_string(),
-        ct: tokio_util::sync::CancellationToken::new(),
-        sse_keep_alive: None,
-    };
 
-    let (sse_server, router) = SseServer::new(config);
+    let token_store = std::sync::Arc::new(TokenStore::new(vec![args.auth_token]));
 
-    // Do something with the router, e.g., add routes or middleware
+    let mcp_service = StreamableHttpService::new(
+        move || {
+            Ok(file_manager::FileManager::new(
+                args.workspace_path_as_string.clone(),
+            ))
+        },
+        LocalSessionManager::default().into(),
+        Default::default(),
+    );
 
-    let listener = tokio::net::TcpListener::bind(sse_server.config.bind).await?;
-    let cancellation_token = sse_server.config.ct.child_token();
-    let server = axum::serve(listener, router).with_graceful_shutdown(async move {
-        cancellation_token.cancelled().await;
-        tracing::info!("sse server cancelled");
-    });
+    let api_router = axum::Router::new().route("/health", axum::routing::get(|| async { "ok" }));
 
-    tokio::spawn(async move {
-        if let Err(e) = server.await {
-            tracing::error!(error = %e, "sse server shutdown with error");
-        }
-    });
+    let mcp_router = axum::Router::new().nest_service("/mcp", mcp_service);
+    let protected_mcp_router = mcp_router.layer(axum::middleware::from_fn_with_state(
+        token_store.clone(),
+        auth_middleware,
+    ));
 
-    let cancellation_token = sse_server.with_service(move || {
-        file_manager::FileManager::new(args.workspace_path_as_string.clone())
-    });
-    tokio::signal::ctrl_c().await?;
-    cancellation_token.cancel();
+    let app = axum::Router::new()
+        .route("/", axum::routing::get(index))
+        .nest("/api", api_router)
+        .merge(protected_mcp_router)
+        .with_state(());
+
+    let addr: std::net::SocketAddr = core::net::SocketAddr::from(([0, 0, 0, 0], args.port));
+    tracing::info!("Server listening on http://{}", addr);
+    let tcp_listener = tokio::net::TcpListener::bind(addr).await?;
+    let _ = axum::serve(tcp_listener, app)
+        .with_graceful_shutdown(async { tokio::signal::ctrl_c().await.unwrap() })
+        .await;
 
     Ok(())
 }
