@@ -10,7 +10,7 @@ use tracing_subscriber::{
     {self},
 };
 
-mod file_manager;
+mod workspace_manager;
 
 /// App configuration from CLI.
 #[derive(Debug, Parser, Clone)]
@@ -95,7 +95,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mcp_service = StreamableHttpService::new(
         move || {
-            Ok(file_manager::FileManager::new(
+            Ok(workspace_manager::WorkspaceManager::new(
                 args.workspace_path_as_string.clone(),
             ))
         },
