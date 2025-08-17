@@ -13,7 +13,6 @@ async fn index() -> axum::response::Html<&'static str> {
     axum::response::Html(INDEX_HTML)
 }
 
-#[tokio::main]
 pub async fn router(
     addr: std::net::SocketAddr,
     _auth_token: String,

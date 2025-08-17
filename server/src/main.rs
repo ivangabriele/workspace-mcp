@@ -38,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
     let addr: std::net::SocketAddr = core::net::SocketAddr::from(([0, 0, 0, 0], args.port));
-    let router = app::router(addr, args.auth_token, args.workspace_path_as_string).unwrap();
+    let router = app::router(addr, args.auth_token, args.workspace_path_as_string).await?;
 
     tracing::info!("Server listening on http://{}", addr);
     let tcp_listener = tokio::net::TcpListener::bind(addr).await?;
